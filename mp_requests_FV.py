@@ -19,8 +19,8 @@ cities = list(set(zm_mex['MUN']))
 
 # We are splitting the number of requests per account because there is a limit in
 #the free trial version
-keywords_1 = util.build_keywords_list(cities[:200], crimes)
-keywords_2 = util.build_keywords_list(cities[200:], crimes)
+keywords_1 = util.build_keywords_list(cities[:10], crimes)
+keywords_2 = util.build_keywords_list(cities[10:20], crimes)
 
 #api_keys = ['0b6de9bf595e40829cb5268169ee7ba7','1a94631ab2124685abc43845400c7ad1']
 api_keys = ['4c385a784ea8469fb21e04c6ff1647e4', 'ba0ab75193234c3a9df448229437b84c']
@@ -94,7 +94,7 @@ def update_dict(q, l):
     '''
     while True:
         article = q.get()
-        l.append(util.get_content(article))
+        l.append(util.do_analysis(article))
         if q.empty():
             q.close()
             print("Queue closed")

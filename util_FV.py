@@ -13,14 +13,30 @@ from pycorenlp import StanfordCoreNLP
 from fuzzywuzzy import fuzz
 from fuzzywuzzy import process
 from nltk.stem.snowball import SnowballStemmer
+from nltk.tokenize import RegexpTokenizer
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.feature_extraction.text import CountVectorizer, TfidfTransformer
+from sklearn.decomposition import LatentDirichletAllocation as LatentDirichletAllocation
 urllib3.disable_warnings()
 
 nlp = StanfordCoreNLP('http://localhots:9000') #NLP object to conduct text analysis
 stemmer = SnowballStemmer("spanish") # SnowballStemmer object fo analyzing text in Spanish
+regex_tokenizer = RegexpTokenizer(r'\w+') # Tokenizer that removes punctuation
 #news_api_key = ['a0849f217c5d4628a7350ce96868c85d', '7d337567864a45f19a5fe1a56d31c1bd'] # Api keys for using news.org
 
 news_api_key = ['1a94631ab2124685abc43845400c7ad1', 'a0849f217c5d4628a7350ce96868c85d'] # Api keys for using news.org
 
+cd_words = ['abuso sexual', 'armas de fuego', 'asalto', 'asalto sexual', 'asesinato', 'asesinato múltiple',
+'asesino en serie', 'crimen organizado', 'crímenes de odio', 'cultivo de drogas', 'delitos homicidio',
+'doble asesinato', 'drogas', 'drogas lavado de dinero', 'el tráfico de drogas','extorsión', 'homicidio',
+'homicidio involuntario', 'infanticidio', 'las armas de fuego', 'lavado de dinero', 'posesión de armas',
+'robo a mano armada', 'secuestro', 'tentativa de asesinato', 'tortura', 'traficante de drogas',
+'traición', 'triple asesinato', 'tráfico de drogas', 'violencia doméstica']
+
+ cc_words = ['alcoholismo','asesinado', 'ataque', 'ataques', 'decapitación', 'disparo', 'ejecuciones',
+'ejecución', 'ejecutado', 'explosiones', 'explosión', 'fuego', 'violencia']
+
+relevant_words = [cd.lower() for cd in cd_words] + [cc.lowe() for cc in cc_words]
 
 
 def make_soup(myurl):
@@ -34,6 +50,21 @@ def make_soup(myurl):
     pm = urllib3.PoolManager()
     html = pm.urlopen(url = myurl, method = 'GET', redirect= False).data
     return bs4.BeautifulSoup(html, 'html5lib')
+
+def clean_doc(text, language='spanish', stem=False):
+    '''
+    Removes unknown characters and punctuation, change capital to lower letters and remove
+    stop words. If stem=False
+    Inputs:
+    sentence (string): a sting to be cleaned
+    Returns: a string
+    '''
+    tokens = regex_tokenizer.tokenize(text)
+    tokens = [t.lower() for t in tokens]
+    tokens = [t for t in tokens if t not in stopwords.words(language)]
+    if stem == True:
+        tokens = [stemmer.stem(t) for t in tokens]
+    return ' '.join(tokens)
 
 def get_text_news(url, tag = 'p'):
     '''
@@ -108,9 +139,10 @@ def is_relevant(tup_list, relevant_words):
 
     relevant_tags = ['CAUSE_OF_DEATH', 'CRIMINAL_CHARGE']
     entity_list = [tup[1] for tup in tup_list if tup[0] in relevant_tags]
-    to_compare = set([stemmer.stem(entity.lower()) for entity in entity_list])
+    to_compare = set([entity.lower() for entity in entity_list])
     relevant_words = set(relevant_words)
     intersect = list(relevant_words.intersection(to_compare))
+    print(len(intersect))
     if len(intersect) > 0:
         return 1
     else:
@@ -130,9 +162,45 @@ def get_content2(article):
     tuple_entities = get_entity_tup(entities)
     relevance = is_relevant(tuple_entities, relevant_words)
     if relevance == 1:
-        return text
+        return clean_doc(text)
 #return get_text_news(article['url'])
 
+def get_topics(text, top_words = 10, topics=5):
+    '''
+    Computes the most important topics in a text.
+    Inputs:
+        - text (string): text to be analyzed
+        - top_words (integer): number of top words to be reported in a topic
+        - topics (integer): number of topics to get from a tex.
+    Returns a list of tupples
+    '''
+    vectorizer = CountVectorizer(analyzer='word', min_df = 0.0, max_df = 1.0)
+    bag_of_words = vectorizer.fit_transform(nltk.word_tokenize(cleaned_corpus[800]))
+    features = vectorizer.get_feature_names()
+    transformer = TfidfTransformer(norm = None ,smooth_idf = True, sublinear_tf = True)
+    tfidf = transformer.fit_transform(bag_of_words)
+    lda = LatentDirichletAllocation( n_topics= topics, learning_method='online')
+    doctopic = lda.fit_transform( tfidf )
+    ls_keywords = []
+    res = []
+    for i, topic in enumerate(lda.components_):
+        word_idx = np.argsort(topic)[::-1][:top_words]
+        keywords = ', '.join( features[i] for i in word_idx)
+        ls_keywords.append(keywords)
+        i+=1
+        res.append((i, keywords))
+        return res
+
+
+def do_analysis(text):
+    '''
+    Get content from an article and do topics analysis.
+    Input:
+        - text (string): text to be analysed
+    Returns a list of topics
+    '''
+    text = get_content2(text)
+    return get_topics(text)
 
 def build_keywords_list(cities_list, crimes_list):
     '''Creates a list with keywords needed for running the search
