@@ -17,9 +17,10 @@ from nltk.tokenize import RegexpTokenizer
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.feature_extraction.text import CountVectorizer, TfidfTransformer
 from sklearn.decomposition import LatentDirichletAllocation as LatentDirichletAllocation
+import numpy as np
 urllib3.disable_warnings()
 
-nlp = StanfordCoreNLP('http://localhots:9000') #NLP object to conduct text analysis
+nlp = StanfordCoreNLP('http://ec2-3-16-203-53.us-east-2.compute.amazonaws.com:9000/') #NLP object to conduct text analysis
 stemmer = SnowballStemmer("spanish") # SnowballStemmer object fo analyzing text in Spanish
 regex_tokenizer = RegexpTokenizer(r'\w+') # Tokenizer that removes punctuation
 #news_api_key = ['a0849f217c5d4628a7350ce96868c85d', '7d337567864a45f19a5fe1a56d31c1bd'] # Api keys for using news.org
@@ -49,7 +50,7 @@ def make_soup(myurl):
     '''
     pm = urllib3.PoolManager()
     html = pm.urlopen(url = myurl, method = 'GET', redirect= False).data
-    return bs4.BeautifulSoup(html, 'html5lib')
+    return bs4.BeautifulSoup(html, "lxml")
 
 def clean_doc(text, language='spanish', stem=False):
     '''
@@ -148,6 +149,13 @@ def is_relevant(tup_list, relevant_words):
     else:
         return 0
 
+def news_collection(response):
+	if 'articles' in response.keys():
+		news_collection = [article for article in response['articles']]
+		return news_collection
+	else:
+		return None
+
 def get_content2(article):
     '''
     Extracts relevant articles from the sources.
@@ -158,7 +166,7 @@ def get_content2(article):
     print('get_content2 working')
     text = get_text_news(article['url'])
     entities = get_entities(text, nlp)
-    print(entitites)
+    print(entities)
     tuple_entities = get_entity_tup(entities)
     relevance = is_relevant(tuple_entities, relevant_words)
     if relevance == 1:
@@ -175,7 +183,7 @@ def get_topics(text, top_words = 10, topics=5):
     Returns a list of tupples
     '''
     vectorizer = CountVectorizer(analyzer='word', min_df = 0.0, max_df = 1.0)
-    bag_of_words = vectorizer.fit_transform(nltk.word_tokenize(cleaned_corpus[800]))
+    bag_of_words = vectorizer.fit_transform(nltk.word_tokenize(text))
     features = vectorizer.get_feature_names()
     transformer = TfidfTransformer(norm = None ,smooth_idf = True, sublinear_tf = True)
     tfidf = transformer.fit_transform(bag_of_words)
@@ -189,7 +197,7 @@ def get_topics(text, top_words = 10, topics=5):
         ls_keywords.append(keywords)
         i+=1
         res.append((i, keywords))
-        return res
+    return res
 
 
 def do_analysis(text):
@@ -278,15 +286,15 @@ def news_dict_of_dict(responses):
                 news_collection.append(article)
     return news_collection
 
-def similarity_score(dict1,dict2):
-    '''Returns a similarity score to test if two strings
-    in two 'different' news are in reality the same
-    inputs: dict1 and dict2: dictionaries
-    output: score (int)'''
-    score_1 = fuzz.token_set_ratio(dict1['title'], dict2['title'])
-    score_2 = fuzz.token_set_ratio(dict1['description'], dict2['description'])
-    score_3 = fuzz.token_set_ratio(dict1['content'], dict2['content'])
-    return 0.4*score_1 + 0.3*score_2 + 0.3*score_3
+# def similarity_score(dict1,dict2):
+#     '''Returns a similarity score to test if two strings
+#     in two 'different' news are in reality the same
+#     inputs: dict1 and dict2: dictionaries
+#     output: score (int)'''
+#     score_1 = fuzz.token_set_ratio(dict1['title'], dict2['title'])
+#     score_2 = fuzz.token_set_ratio(dict1['description'], dict2['description'])
+#     score_3 = fuzz.token_set_ratio(dict1['content'], dict2['content'])
+#     return 0.4*score_1 + 0.3*score_2 + 0.3*score_3
 
 #
 # def compare_similarity(d):
