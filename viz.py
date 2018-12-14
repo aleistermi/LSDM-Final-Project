@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import warnings
 warnings.filterwarnings("ignore")
 
-def create_txt_from_csv(csv):
+def create_dict_from_csv(csv):
     '''creates a dictionary of topics for each city
     inputs:
         csv(string)
